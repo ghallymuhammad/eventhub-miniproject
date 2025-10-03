@@ -1,0 +1,167 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  organizedEvents Event[]   @relation("EventOrganizer")
+  transactions    Transaction[]
+  tickets         Ticket[]
+  reviews         Review[]
+
+  @@map("users")
+}
+
+// Event model
+model Event {
+  id              String   @id @default(cuid())
+  title           String
+  description     String
+  fullDescription String?
+  date            DateTime
+  time            String
+  location        String
+  category        String
+  image           String?
+  capacity        Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  organizer       User       @relation("EventOrganizer", fields: [organizerId], references: [id])
+  organizerId     String
+  ticketTypes     TicketType[]
+  transactions    Transaction[]
+  reviews         Review[]
+
+  @@map("events")
+}
+
+// Ticket Type model
+model TicketType {
+  id          String @id @default(cuid())
+  name        String
+  price       Float
+  description String?
+  quantity    Int
+  sold        Int    @default(0)
+
+  // Relations
+  event       Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId     String
+  tickets     Ticket[]
+  transactionTickets TransactionTicket[]
+
+  @@map("ticket_types")
+}
+
+// Transaction model
+model Transaction {
+  id                String            @id @default(cuid())
+  userId            String
+  eventId           String
+  totalAmount       Float
+  status            TransactionStatus @default(PENDING)
+  paymentMethod     String?
+  paymentReference  String?
+  pointsUsed        Int?              @default(0)
+  voucherCode       String?
+  discountAmount    Float?            @default(0)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  // Relations
+  user              User              @relation(fields: [userId], references: [id])
+  event             Event             @relation(fields: [eventId], references: [id])
+  transactionTickets TransactionTicket[]
+  tickets           Ticket[]
+
+  @@map("transactions")
+}
+
+// Transaction Ticket model (junction table)
+model TransactionTicket {
+  id           String @id @default(cuid())
+  transactionId String
+  ticketTypeId String
+  quantity     Int
+  unitPrice    Float
+
+  // Relations
+  transaction  Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  ticketType   TicketType  @relation(fields: [ticketTypeId], references: [id])
+
+  @@map("transaction_tickets")
+}
+
+// Individual Ticket model
+model Ticket {
+  id            String       @id @default(cuid())
+  ticketCode    String       @unique
+  userId        String
+  transactionId String
+  ticketTypeId  String
+  status        TicketStatus @default(ACTIVE)
+  usedAt        DateTime?
+  createdAt     DateTime     @default(now())
+
+  // Relations
+  user          User         @relation(fields: [userId], references: [id])
+  transaction   Transaction  @relation(fields: [transactionId], references: [id])
+  ticketType    TicketType   @relation(fields: [ticketTypeId], references: [id])
+
+  @@map("tickets")
+}
+
+// Review model
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  eventId   String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id])
+  event     Event    @relation(fields: [eventId], references: [id])
+
+  @@map("reviews")
+}
+
+// Enums
+enum Role {
+  USER
+  ORGANIZER
+  ADMIN
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum TicketStatus {
+  ACTIVE
+  USED
+  CANCELLED
+}
